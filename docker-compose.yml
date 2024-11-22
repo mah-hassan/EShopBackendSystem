@@ -1,0 +1,120 @@
+version: '3.4'
+
+services:
+    eshop.api:
+        image: ${DOCKER_REGISTRY-}eshopapi
+        build:
+            context: .
+            dockerfile: EShop.Api/Dockerfile
+        depends_on:
+            - eshop.db
+            - eshop.seq
+            - eshop.elasticsearch
+            - eshop.rabbitmq
+        ports:
+            - 5000:5000  
+            - 5001:5001 
+        environment: 
+            - ConnectionStrings:OnlineEShopDb=Server=eshop.db,1433;Database=EShop;User Id=sa;Password=@ESHOP123@; Trust Server Certificate=true;
+        networks:
+            - eshop-network
+
+    eshop.seq:
+        image: datalust/seq:latest
+        container_name: eshop.seq
+        hostname: eshop.seq
+        environment:
+            - ACCEPT_EULA=Y
+        ports:
+            - 5341:5341
+            - 8081:80
+        networks:
+            - eshop-network
+
+    eshop.db:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        container_name: eshop.db
+        hostname: eshop.db
+        environment:
+            - ACCEPT_EULA=Y
+            - MSSQL_SA_PASSWORD=@ESHOP123@
+        ports:
+            - 1433:1433
+        volumes:
+            - eshop_db_data:/var/opt/mssql
+        networks:
+            - eshop-network
+
+    eshop.redis:
+        image: redis:latest
+        container_name: eshop.redis
+        hostname: eshop.redis
+        ports:
+            - 6379:6379
+        volumes:
+            - eshop_redis_data:/data
+        networks:
+            - eshop-network
+
+    eshop.rabbitmq:
+        image: rabbitmq:3-management
+        container_name: eshop.rabbitmq
+        hostname: eshop.queue
+        ports:
+            - 5672:5672   
+            - 15672:15672
+        environment:
+            RABBITMQ_DEFAULT_USER: user
+            RABBITMQ_DEFAULT_PASS: password
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+            - rabbitmq_log:/var/log/rabbitmq
+        networks:
+            - eshop-network
+
+    eshop.elasticsearch:
+        image: elasticsearch:8.15.1
+        container_name: eshop.elasticsearch
+        hostname: eshop.elasticsearch
+        ports:
+            - 9200:9200
+        environment:
+            - discovery.type=single-node
+            - xpack.security.enabled=false
+        networks:
+            - eshop-network
+        volumes:
+            - elasticsearch_data:/usr/share/elasticsearch/data
+
+    keycloak:
+        image: quay.io/keycloak/keycloak:latest
+        container_name: eshop.keycloak
+        hostname: eshop.keycloak
+        environment:
+            KEYCLOAK_ADMIN: admin
+            KEYCLOAK_ADMIN_PASSWORD: admin
+        command: start-dev
+        ports:
+            - 8080:8080
+        volumes:
+            - Keycloak_data:/opt/keycloak/data
+        networks:
+            - eshop-network
+
+networks:
+    eshop-network:
+        driver: bridge
+
+volumes:
+    eshop_db_data:
+        name: eshop_db_data
+    eshop_redis_data:
+        name: eshop_redis_data
+    rabbitmq_data:
+        name: rabbitmq_data
+    rabbitmq_log:
+        name: rabbitmq_log
+    elasticsearch_data:
+        name: elasticsearch_data
+    Keycloak_data:
+        name: Keycloak_data
